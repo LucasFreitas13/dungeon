@@ -4,13 +4,13 @@ import constants
 from constants import *
 
 class Character():
-    def __init__(self, x, y, health, mob_animations, char_type):
+    def __init__(self, x, y, health, mob_animations, char_type, boss, size):
         self.char_type = char_type
+        self.boss = boss
         self.score = 0
         # Personagem começa olhando para a direita.
         self.flip = False
         self.animation_list = mob_animations[char_type]
-        #
         self.frame_index = 0
         self.action = 0 # 0=Parado, 1= Correndo
         self.update_time = pygame.time.get_ticks()
@@ -22,13 +22,14 @@ class Character():
         # Passando para aceitar uma imagem como parâmetro.
         self.image = self.animation_list[self.action][self.frame_index]
         # Criando um retângulo para representar o personagem.
-        self.rect = pygame.Rect(0, 0, constants.TILE_SIZE, constants.TILE_SIZE)
+        self.rect = pygame.Rect(0, 0, constants.TILE_SIZE * size, constants.TILE_SIZE * size)
         # Definindo a posição inicial do personagem.
         self.rect.center = (x, y)
 
-    def move(self, dx, dy):
+    def move(self, dx, dy, obstacle_tiles):
         screen_scroll = [0, 0]
         self.running = False
+
         # Verificando se o personagem está se movimentando.
         if dx != 0 or dy != 0:
             self.running = True
@@ -36,13 +37,33 @@ class Character():
             self.flip = True
         if dx > 0:
             self.flip = False
+
         # Controle da velocidade diagonal.
         if dx != 0 and dy != 0:
             dx *= (math.sqrt(2)/2)
             dy *= (math.sqrt(2)/2)
-        # Alterando a posição do personagem.
+
+        # Checando por colisões com o mapa na direção x.
         self.rect.x += dx
+        for obstacle in obstacle_tiles:
+            # Checando por colisões.
+            if obstacle[1].colliderect(self.rect):
+                # Verificando de qual lado está vindo a colisão.
+                if dx > 0:
+                    self.rect.right = obstacle[1].left
+                if dx < 0:
+                    self.rect.left = obstacle[1].right
+
+        # Checando por colisões com o mapa na direção y.
         self.rect.y += dy
+        for obstacle in obstacle_tiles:
+            # Checando por colisões.
+            if obstacle[1].colliderect(self.rect):
+                # Verificando de qual lado está vindo a colisão.
+                if dy < 0:
+                    self.rect.top = obstacle[1].bottom
+                if dy > 0:
+                    self.rect.bottom = obstacle[1].top        
 
         # Movimento da imagem apenas para o jogador.
         if self.char_type == 0:
