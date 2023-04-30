@@ -58,8 +58,9 @@ item_images.append(red_potion)
 # Carregando imagens das armas.
 bow_img = scale_img(pygame.image.load("/home/lucasfreitas13/vscode/dungeon/assets/images/weapons/bow.png").convert_alpha(), constants.WEAPON_SCALE)
 arrow_img = scale_img(pygame.image.load("/home/lucasfreitas13/vscode/dungeon/assets/images/weapons/arrow.png").convert_alpha(), constants.WEAPON_SCALE)
+fireball_image = scale_img(pygame.image.load("/home/lucasfreitas13/vscode/dungeon/assets/images/weapons/fireball.png").convert_alpha(), constants.FIREBALL_SCALE)
 
-# Caarregndo imagem dos tiles.
+# Carregando imagem dos tiles.
 tile_list = []
 for x in range(constants.TILES_TYPE):
     tile_image = pygame.image.load(f"/home/lucasfreitas13/vscode/dungeon/assets/images/tiles/{x}.png").convert_alpha()
@@ -163,6 +164,7 @@ enemy_list = world.character_list
 damage_text_group = pygame.sprite.Group()
 arrow_group = pygame.sprite.Group()
 item_group = pygame.sprite.Group()
+fireball_group = pygame.sprite.Group()
 
 score_coin = Item(constants.SCREEN_WIDTH - 120, 23, 0, coin_images, True)
 item_group.add(score_coin)
@@ -198,8 +200,11 @@ while run:
     # Atualizando todos os objetos.
     world.update(screen_scroll)
     for enemy in enemy_list:
-        enemy.ai(screen_scroll)
-        enemy.update()
+        fireball = enemy.ai(player, world.obstacle_tiles, screen_scroll, fireball_image)
+        if fireball:
+            fireball_group.add(fireball)
+        if enemy.alive:
+            enemy.update()
 
     player.update()
     arrow = bow.update(player)
@@ -207,20 +212,17 @@ while run:
         arrow_group.add(arrow)
 
     for arrow in arrow_group:
-        damage, damage_pos = arrow.update(screen_scroll, enemy_list)
+        damage, damage_pos = arrow.update(screen_scroll, world.obstacle_tiles, enemy_list)
         if damage:
             damage_text = DamageText(damage_pos.centerx, damage_pos.y, str(damage), constants.RED)
             damage_text_group.add(damage_text)
 
     damage_text_group.update()
+    fireball_group.update(screen_scroll, player)
     item_group.update(screen_scroll, player)
 
     # Desenhando o mapa na tela.
     world.draw(screen)
-
-    bow.draw(screen)
-    for arrow in arrow_group:
-        arrow.draw(screen)
 
     # Desenho o personagem na tela.
     player.draw(screen)
@@ -228,6 +230,14 @@ while run:
     # Desenho o inimigo na tela.
     for enemy in enemy_list:
         enemy.draw(screen)
+
+    bow.draw(screen)
+    for arrow in arrow_group:
+        arrow.draw(screen)
+
+    for fireball in fireball_group:
+        fireball.draw(screen)
+
     damage_text_group.draw(screen)
     item_group.draw(screen)
     draw_info()
