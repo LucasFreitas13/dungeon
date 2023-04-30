@@ -1,6 +1,7 @@
 import pygame
 import math
 import constants
+import weapon
 from constants import *
 
 class Character():
@@ -8,15 +9,18 @@ class Character():
         self.char_type = char_type
         self.boss = boss
         self.score = 0
-        # Personagem começa olhando para a direita.
-        self.flip = False
+        self.flip = False # Personagem começa olhando para a direita.
         self.animation_list = mob_animations[char_type]
         self.frame_index = 0
-        self.action = 0 # 0=Parado, 1= Correndo
+        self.action = 0 # 0= Parado, 1= Correndo
         self.update_time = pygame.time.get_ticks()
         self.running = False
         self.health = health
         self.alive = True
+        self.hit = False
+        self.last_hit = pygame.time.get_ticks()
+        self.last_attack = pygame.time.get_ticks()
+        self.stunned = False
 
 
         # Passando para aceitar uma imagem como parâmetro.
@@ -88,17 +92,79 @@ class Character():
 
         return screen_scroll
     
-    def ai(self, screen_scroll):
+    def ai(self, player, obstacle_tiles, screen_scroll, fireball_image):
+        clipped_line = ()
+        stun_cooldown = 100
+        ai_dx = 0
+        ai_dy = 0
+        fireball = None
         # Reposicionando os mobs baseado no screen scroll
         self.rect.x += screen_scroll[0]
         self.rect.y += screen_scroll[1]
 
+        # Criando uma linha de visão para o inimigo (ver o jogador)
+        line_of_sight = ((self.rect.centerx, self.rect.centery), (player.rect.centerx, player.rect.centery))
+        # Verificando se o jogador está no campo de visão do inimigo
+        for obstacle in obstacle_tiles:
+            if obstacle[1].clipline(line_of_sight):
+                clipped_line = obstacle[1].clipline(line_of_sight)
+
+        # Verificando a distância entre o jogador e o inimigo
+        dist = ((self.rect.centerx - player.rect.centerx)**2 + (self.rect.centery - player.rect.centery)**2)**0.5
+        if not clipped_line and dist > constants.RANGE:
+            if self.rect.centerx > player.rect.centerx:
+                ai_dx = -constants.ENEMY_SPEED
+            if self.rect.centerx < player.rect.centerx:
+                ai_dx = constants.ENEMY_SPEED
+            if self.rect.centery > player.rect.centery:
+                ai_dy = -constants.ENEMY_SPEED
+            if self.rect.centery < player.rect.centery:
+                ai_dy = constants.ENEMY_SPEED
+
+        if self.alive:
+            if not self.stunned:
+                self.move(ai_dx, ai_dy, obstacle_tiles)
+                # Atacando o personagem.
+                if dist < constants.ATTACK_RANGE and player.hit == False:
+                    player.health -= constants.ENEMY_DAMAGE
+                    player.hit = True
+                    player.last_hit = pygame.time.get_ticks()
+
+            # Lançamento de bolas de fogo do boss.
+            fireball_cooldown = 700
+            if self.boss:
+                if dist < 500:
+                    if (pygame.time.get_ticks() - self.last_attack) >= fireball_cooldown:
+                        self.last_fireball = pygame.time.get_ticks()
+                        fireball = weapon.Fireball(fireball_image, self.rect.centerx, self.rect.centery, player.rect.centerx, player.rect.centery)
+                        self.last_attack = pygame.time.get_ticks()
+
+            # Checando se sofreu um hit
+            if self.hit == True:
+                self.hit = False
+                self.last_hit = pygame.time.get_ticks()
+                self.stunned = True 
+                self.running = False
+                self.update_action(0)
+            
+            if (pygame.time.get_ticks() - self.last_hit) > stun_cooldown:
+                self.stunned = False
+
+        return fireball
 
     def update(self):
         # Verificando se personagem está vivo.
         if self.alive <= 0:
             self.health = 0
             self.alive = False
+
+        # Resetando o dano recebido pelo personagem.
+        hit_cooldown = 1000
+        if self.char_type == 0:
+            if self.hit == True and (pygame.time.get_ticks() - self.last_hit) > hit_cooldown:
+                self.hit = False
+
+        
         # Verificando qual ação o personagme está fazendo.
         if self.running == True:
             self.update_action(1)
@@ -133,6 +199,3 @@ class Character():
             surface.blit(flipped_image, (self.rect.x, self.rect.y - constants.SCALE * constants.OFFSET))
         else:
             surface.blit(flipped_image, self.rect)
-        # Desenhando o personagem na tela.
-        pygame.draw.rect(surface, RED, self.rect, 1)
-        
